@@ -1,8 +1,6 @@
 name: Workflow Events
 
 on: 
-  workflow_dispatch:
-
   push:
   pull_request:
   schedule:
