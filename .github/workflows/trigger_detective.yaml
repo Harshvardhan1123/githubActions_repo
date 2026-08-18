@@ -1,0 +1,37 @@
+#Your team keeps getting confused about which event caused a workflow to run. Write a new workflow called Trigger Detective that:
+
+#Triggers on push, pull_request, and manual dispatch (workflow_dispatch)
+#Has one job called detect that runs on the latest Ubuntu runner
+#Prints the name of the event that triggered the run
+#If the event is a push, additionally print the branch that was pushed to
+#If the event is a pull_request, additionally print the source and target branches
+#Finishes by printing "Detective work complete"
+
+
+
+name: Trigger Detective
+
+"on":
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Print trigger event
+        run: echo "Workflow triggered by: ${{ github.event_name }}"
+
+      - name: Print pushed branch
+        if: ${{ github.event_name == 'push' }}
+        run: echo "Pushed to branch: ${{ github.ref_name }}"
+
+      - name: Print pull request branches
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          echo "Source branch: ${{ github.head_ref }}"
+          echo "Target branch: ${{ github.base_ref }}"
+
+      - name: Complete detective work
+        run: echo "Detective work complete"

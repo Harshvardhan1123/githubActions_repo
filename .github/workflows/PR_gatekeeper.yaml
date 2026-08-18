@@ -1,3 +1,13 @@
+#Your team wants a workflow that only runs checks when someone proposes a change, not on every single commit to every branch. Write a new #workflow called PR Gatekeeper that:
+
+#Triggers only on pull requests targeting the main branch
+#Also allows the workflow to be triggered manually
+#Has one job called checks that runs on the latest Ubuntu runner
+#Prints which branch the PR is being merged into
+#Prints the PR number
+#Finishes by printing "Gatekeeper checks complete"
+
+
 name: PR Gatekeeper
 
 on:

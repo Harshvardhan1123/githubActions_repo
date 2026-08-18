@@ -1,3 +1,12 @@
+#Your team wants a workflow that tidies things up every night without anyone having to remember to run it, but they also want the option to trigger it by hand when testing changes. Write a new workflow called Nightly Housekeeper that:
+
+#Triggers on a schedule that runs once every day at 2 AM UTC
+#Also allows manual triggering
+#Has one job called cleanup that runs on the latest Ubuntu runner
+#Prints the current date and time
+#Prints a message saying "Running nightly cleanup"
+#Finishes by printing "Housekeeping complete"
+
 name: Nightly Housekeeper
 
 on:
