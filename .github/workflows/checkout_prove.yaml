@@ -1,0 +1,26 @@
+name: Checkout and Prove
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  checkout_and_prove:
+    runs-on: ubuntu-latest
+    steps:
+      - name: current folder path
+        run: pwd
+
+      - name: List contents
+        run: ls
+
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: List contents after checkout
+        run: ls
+      
+      - name: count how many files are now present
+        run: ls | wc -l
+
+      - name: proof finish
+        run: echo "Proof captured"
