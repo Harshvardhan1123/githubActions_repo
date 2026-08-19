@@ -1,27 +1,24 @@
-name: Trigger Detective
-
+name: Multi Trigger
 on:
   push:
   pull_request:
   workflow_dispatch:
 
-jobs:
-  detect:
+jobs: 
+  multi_trigger: 
     runs-on: ubuntu-latest
-
     steps:
-      - name: Print trigger event
-        run: echo "Workflow triggered by: ${{ github.event_name }}"
-
-      - name: Print pushed branch
-        if: ${{ github.event_name == 'push' }}
-        run: echo "Pushed to branch: ${{ github.ref_name }}"
-
-      - name: Print pull request branches
-        if: ${{ github.event_name == 'pull_request' }}
+      - name: details of Multi Trigger
         run: |
-          echo "Source branch: ${{ github.head_ref }}"
-          echo "Target branch: ${{ github.base_ref }}"
+          echo "Triggered by event: ${{ github.event_name }}"
+          
+          if [ "${{ github.event_name }}" = "push" ]; then
+             echo "Pushed to branch : ${{ github.ref_name }}"
+          fi
 
-      - name: Complete detective work
-        run: echo "Detective work complete"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+             echo "Source branch : ${{ github.head_ref }}"
+             echo "Target branch : ${{ github.base_ref }}"
+          fi
+          
+          echo "Detective work"
