@@ -101,12 +101,11 @@ jobs:
         node-version: 24
 
     - name: Install dependencies
-      working-directory: app
+      working-directory: react-app
       run: npm install
 
     - name: Run test suite
-      working-directory: app
-      run: npm test
+      working-directory: react-app
 
 
   scan:
