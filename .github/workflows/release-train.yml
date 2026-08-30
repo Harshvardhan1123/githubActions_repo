@@ -148,14 +148,16 @@ jobs:
   # ==========================================
 
   announce:
-    name: Announce
-    needs: package
-    if: ${{ needs.package.result == 'success' }}
-    runs-on: ubuntu-latest
+  name: Announce
+  needs: package
+  if: ${{ needs.package.result == 'success' }}
+  runs-on: ubuntu-latest
+  steps:
+    - name: Check out repository
+      uses: actions/checkout@v4
 
-    steps:
-      - name: Announce release
-        run: |
+    - name: Announce release
+      run: |
           SHORT_SHA="${GITHUB_SHA:0:7}"
           RELEASE_REFERENCE="${SERVICE_NAME}-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
 
