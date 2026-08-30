@@ -14,25 +14,26 @@ on:
 
   workflow_dispatch:
 
+# Workflow-level variable
 env:
   SERVICE_NAME: node-service
 
+# All run commands operate inside app/
 defaults:
   run:
     working-directory: app
-
 
 jobs:
 
   # ==========================================
   # JOB 1: VERIFY
   # ==========================================
+
   verify:
     name: Verify
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Check out repository
         uses: actions/checkout@v4
 
@@ -64,18 +65,14 @@ jobs:
   # ==========================================
   # JOB 2: PACKAGE
   # ==========================================
+
   package:
     name: Package
     needs: verify
     if: ${{ needs.verify.result == 'success' }}
     runs-on: ubuntu-latest
 
-    # Job-level variables
-    env:
-      SERVICE_NAME: ${{ env.SERVICE_NAME }}
-
     steps:
-
       - name: Check out repository
         uses: actions/checkout@v4
 
@@ -87,7 +84,6 @@ jobs:
       - name: Build release reference
         run: |
           SHORT_SHA="${GITHUB_SHA:0:7}"
-
           RELEASE_REFERENCE="${SERVICE_NAME}-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
 
           echo "RELEASE_REFERENCE=$RELEASE_REFERENCE" >> "$GITHUB_ENV"
@@ -150,6 +146,7 @@ jobs:
   # ==========================================
   # JOB 3: ANNOUNCE
   # ==========================================
+
   announce:
     name: Announce
     needs: package
@@ -157,7 +154,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-
       - name: Announce release
         run: |
           SHORT_SHA="${GITHUB_SHA:0:7}"
