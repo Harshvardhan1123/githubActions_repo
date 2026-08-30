@@ -1,0 +1,174 @@
+name: Smart Dispatcher
+
+on:
+  workflow_dispatch:
+    inputs:
+      risk_level:
+        description: "Risk level"
+        required: true
+        type: choice
+        options:
+          - low
+          - medium
+          - high
+          - critical
+        default: low
+
+      notify:
+        description: "Notify on-call"
+        required: true
+        type: boolean
+        default: false
+
+      dry_run:
+        description: "Run in dry-run mode"
+        required: true
+        type: boolean
+        default: false
+
+      owner:
+        description: "Owner"
+        required: true
+        type: string
+
+      components:
+        description: "Components (comma-separated)"
+        required: true
+        type: string
+
+
+run-name: ${{ format('{0} | {1} | {2}', inputs.risk_level == 'low' && 'LOW' || inputs.risk_level == 'medium' && 'MEDIUM' || inputs.risk_level == 'high' && 'HIGH' || 'CRITICAL', inputs.owner, inputs.dry_run && 'DRY-RUN' || '') }}
+
+
+jobs:
+
+  classify:
+    name: Classify
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Print components
+        run: |
+          echo "Components: ${{ inputs.components }}"
+
+      - name: Check database
+        run: |
+          if ${{ contains(inputs.components, 'database') }}; then
+            echo "Components mention database: yes"
+          else
+            echo "Components mention database: no"
+          fi
+
+      - name: Check auth
+        run: |
+          if ${{ contains(inputs.components, 'auth') }}; then
+            echo "Components mention auth: yes"
+          else
+            echo "Components mention auth: no"
+          fi
+
+      - name: Demonstrate startsWith and endsWith
+        run: |
+          if ${{ startsWith(inputs.owner, 'H') }}; then
+            echo "Owner starts with capital H: yes"
+          else
+            echo "Owner starts with capital H: no"
+          fi
+
+          if ${{ endsWith(inputs.components, ',') }}; then
+            echo "Components ends with a trailing comma: yes"
+          else
+            echo "Components ends with a trailing comma: no"
+          fi
+
+      - name: Natural classification
+        run: |
+          echo "${{ format('Risk level is {0}, owned by {1}, and the components are {2}.', inputs.risk_level, inputs.owner, inputs.components) }}"
+
+
+  gate:
+    name: Gate
+    needs: classify
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: High or critical database gate
+        if: ${{ (inputs.risk_level == 'high' || inputs.risk_level == 'critical') && contains(inputs.components, 'database') }}
+        run: |
+          echo "Gate 1 satisfied: risk is high or critical and components include database."
+
+      - name: Critical or notify gate
+        if: ${{ inputs.risk_level == 'critical' || inputs.notify }}
+        run: |
+          echo "Gate 2 satisfied: risk is critical or notification is enabled."
+
+      - name: Non-low non-dry-run gate
+        if: ${{ !inputs.dry_run && inputs.risk_level != 'low' }}
+        run: |
+          echo "Gate 3 satisfied: this is not a dry run and the risk is not low."
+
+
+  execute:
+    name: Execute
+    needs: gate
+    if: ${{ always() }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Step A - Deliberate dry-run failure
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo "Dry run requested: deliberately failing before execution."
+          exit 1
+
+      - name: Step B - Stop after dry-run failure
+        if: ${{ failure() }}
+        run: |
+          echo "Dry run stopped before execution"
+
+      - name: Step C - Proceed with execution
+        if: ${{ success() && !failure() }}
+        run: |
+          echo "Execution proceeded"
+
+      - name: Step D - Job status summary
+        if: ${{ always() }}
+        run: |
+          echo "Gate result: ${{ needs.gate.result }}"
+          echo "Execute job status: ${{ job.status }}"
+
+          if [ "${{ needs.gate.result }}" = "success" ]; then
+            echo "Gate succeeded."
+          elif [ "${{ needs.gate.result }}" = "skipped" ]; then
+            echo "Gate was skipped."
+          elif [ "${{ needs.gate.result }}" = "failure" ]; then
+            echo "Gate failed."
+          fi
+
+          if [ "${{ job.status }}" = "success" ]; then
+            echo "Execute is currently succeeding."
+          else
+            echo "Execute has already failed."
+          fi
+
+
+  close:
+    name: Close
+    needs: execute
+    if: ${{ always() }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Close summary
+        run: |
+          echo "${{ format('Risk level: {0}, Owner: {1}, Dry run: {2}, CLOSED', inputs.risk_level, inputs.owner, inputs.dry_run) }}"
+
+      - name: Dispatcher closed
+        run: |
+          echo "Dispatcher closed"
