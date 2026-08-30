@@ -1,0 +1,176 @@
+name: Release Train
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+    branches:
+      - main
+
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+env:
+  SERVICE_NAME: node-service
+
+defaults:
+  run:
+    working-directory: app
+
+
+jobs:
+
+  # ==========================================
+  # JOB 1: VERIFY
+  # ==========================================
+  verify:
+    name: Verify
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: app/package-lock.json
+
+      - name: Print build environment
+        run: |
+          echo "Node version:"
+          node --version
+
+          echo "npm version:"
+          npm --version
+
+          echo "Node binary:"
+          which node
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test
+
+
+  # ==========================================
+  # JOB 2: PACKAGE
+  # ==========================================
+  package:
+    name: Package
+    needs: verify
+    if: ${{ needs.verify.result == 'success' }}
+    runs-on: ubuntu-latest
+
+    # Job-level variables
+    env:
+      SERVICE_NAME: ${{ env.SERVICE_NAME }}
+
+    steps:
+
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Build release reference
+        run: |
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+
+          RELEASE_REFERENCE="${SERVICE_NAME}-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
+
+          echo "RELEASE_REFERENCE=$RELEASE_REFERENCE" >> "$GITHUB_ENV"
+
+          echo "Release reference: $RELEASE_REFERENCE"
+
+      - name: Install jq and tree
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq tree
+
+      - name: Create release directory
+        run: |
+          mkdir -p release
+
+      - name: Create release reference file
+        run: |
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          cat > "release/$RELEASE_REFERENCE" <<EOF
+          Deployment target: ${{ vars.DEPLOYMENT_TARGET }}
+          Ref: ${{ github.ref }}
+          Event: ${{ github.event_name }}
+          Triggered by: ${{ github.actor }}
+          Build time UTC: $BUILD_TIME
+          EOF
+
+      - name: Copy application file
+        run: |
+          cp index.js release/index.js
+
+      - name: Create manifest.json
+        run: |
+          BUILD_TIME=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          jq -n \
+            --arg deployment_target "${{ vars.DEPLOYMENT_TARGET }}" \
+            --arg ref "${{ github.ref }}" \
+            --arg event "${{ github.event_name }}" \
+            --arg triggered_by "${{ github.actor }}" \
+            --arg build_time "$BUILD_TIME" \
+            '{
+              deployment_target: $deployment_target,
+              ref: $ref,
+              event: $event,
+              triggered_by: $triggered_by,
+              build_time_utc: $build_time
+            }' > release/manifest.json
+
+      - name: Prove manifest parses
+        run: |
+          echo "Deployment target from manifest:"
+          jq -r '.deployment_target' release/manifest.json
+
+      - name: Print release folder structure
+        run: |
+          tree -L 2 release
+
+
+  # ==========================================
+  # JOB 3: ANNOUNCE
+  # ==========================================
+  announce:
+    name: Announce
+    needs: package
+    if: ${{ needs.package.result == 'success' }}
+    runs-on: ubuntu-latest
+
+    steps:
+
+      - name: Announce release
+        run: |
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          RELEASE_REFERENCE="${SERVICE_NAME}-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
+
+          echo "Release reference: $RELEASE_REFERENCE"
+          echo "Deployment target: ${{ vars.DEPLOYMENT_TARGET }}"
+          echo "Service name: $SERVICE_NAME"
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            echo "Release candidate announced."
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "Release announced."
+          fi
+
+          echo "Release train complete"

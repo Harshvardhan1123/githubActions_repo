@@ -1,0 +1,9 @@
+{
+  "name": "release-train-service",
+  "version": "1.0.0",
+  "description": "Node service for Release Train",
+  "main": "index.js",
+  "scripts": {
+    "test": "node test.js"
+  }
+}
