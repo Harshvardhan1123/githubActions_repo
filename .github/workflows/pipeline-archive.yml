@@ -1,0 +1,205 @@
+name: Pipeline Archive
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+  workflow_dispatch:
+    inputs:
+      build_mode:
+        description: "Choose build mode"
+        required: true
+        type: choice
+        options:
+          - quick
+          - full
+        default: quick
+
+      skip_cache:
+        description: "Skip dependency cache"
+        required: true
+        type: boolean
+        default: false
+
+env:
+  APP_NAME: react-app
+
+jobs:
+
+  # =========================================================
+  # JOB 1: TEST-BUILD
+  # =========================================================
+  test-build:
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: react-app
+
+    outputs:
+      build_ran: ${{ steps.build-status.outputs.build_ran }}
+
+    steps:
+
+      # Checkout repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Setup Node
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: react-app/package-lock.json
+
+      # Cache node_modules
+      - name: Cache node_modules
+        id: cache
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.skip_cache == false }}
+        uses: actions/cache@v4
+        with:
+          path: react-app/node_modules
+          key: ${{ runner.os }}-node-modules-${{ hashFiles('react-app/package-lock.json') }}
+
+      # Install only if cache was not used
+      - name: Install dependencies
+        if: ${{ steps.cache.outputs.cache-hit != 'true' }}
+        run: npm ci
+
+      # Run tests with coverage
+      - name: Run tests with coverage
+        run: npm test -- --watchAll=false --coverage
+
+      # Upload coverage
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-coverage-${{ github.run_number }}
+          path: react-app/coverage
+          retention-days: ${{ vars.ARTIFACT_RETENTION_DAYS }}
+
+      # Build application
+      - name: Build application
+        if: ${{ (github.event_name == 'workflow_dispatch' && inputs.build_mode == 'full') || (github.event_name == 'push' && github.ref == 'refs/heads/main') }}
+        run: npm run build
+
+      # Explain skipped build
+      - name: Explain skipped build
+        if: ${{ !((github.event_name == 'workflow_dispatch' && inputs.build_mode == 'full') || (github.event_name == 'push' && github.ref == 'refs/heads/main')) }}
+        run: echo "Build skipped because this is a quick run and the trigger is not a push to main."
+
+      # Record whether build ran
+      - name: Record build status
+        id: build-status
+        shell: bash
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "build_ran=true" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "workflow_dispatch" && "${{ inputs.build_mode }}" == "full" ]]; then
+            echo "build_ran=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "build_ran=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # Upload build artifact
+      - name: Upload build artifact
+        if: ${{ steps.build-status.outputs.build_ran == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.APP_NAME }}-build-${{ github.sha }}
+          path: react-app/build
+          retention-days: ${{ vars.ARTIFACT_RETENTION_DAYS }}
+
+      # One-line summary
+      - name: Pipeline summary
+        shell: bash
+        run: |
+          echo "${{ format('App: {0} | Build mode: {1} | Cache used: {2}', env.APP_NAME, github.event_name == 'workflow_dispatch' && inputs.build_mode || 'n/a — push', steps.cache.outputs.cache-hit == 'true') }}"
+
+
+  # =========================================================
+  # JOB 2: VERIFY-ARCHIVE
+  # =========================================================
+  verify-archive:
+    needs: test-build
+
+    if: ${{ always() && needs.test-build.result == 'success' }}
+
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # Checkout
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # Download coverage
+      - name: Download coverage artifact
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ env.APP_NAME }}-coverage-${{ github.run_number }}
+          path: archive/coverage
+
+      # Download build only when build happened
+      - name: Download build artifact
+        if: ${{ needs.test-build.outputs.build_ran == 'true' }}
+        uses: actions/download-artifact@v5
+        with:
+          name: ${{ env.APP_NAME }}-build-${{ github.sha }}
+          path: archive/build
+
+      # Install tree
+      - name: Install tree
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tree
+
+      # Show folder structure
+      - name: Show archive structure
+        run: |
+          echo "Downloaded archive structure:"
+          tree archive -L 2
+
+      # Install jq
+      - name: Install jq
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq
+
+      # Create manifest
+      - name: Create archive manifest
+        shell: bash
+        run: |
+          if [[ "${{ needs.test-build.outputs.build_ran }}" == "true" ]]; then
+            BUILD_PRESENT=true
+          else
+            BUILD_PRESENT=false
+          fi
+
+          cat > archive-manifest.json <<EOF
+          {
+            "app_name": "${{ env.APP_NAME }}",
+            "run_number": ${{ github.run_number }},
+            "retention_days": ${{ vars.ARTIFACT_RETENTION_DAYS }},
+            "build_artifact_present": $BUILD_PRESENT
+          }
+          EOF
+
+          echo "Archive manifest:"
+          cat archive-manifest.json
+
+      # Read manifest using jq
+      - name: Read manifest with jq
+        run: |
+          APP_NAME_FROM_MANIFEST=$(jq -r '.app_name' archive-manifest.json)
+          echo "Manifest app name: $APP_NAME_FROM_MANIFEST"
+
+      # Final message
+      - name: Archive verified
+        run: echo "Archive verified"
