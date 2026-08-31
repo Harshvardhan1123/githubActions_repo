@@ -1,3 +1,4 @@
+```yaml
 name: Release Train
 
 on:
@@ -28,7 +29,6 @@ jobs:
   # ==========================================
   # JOB 1: VERIFY
   # ==========================================
-
   verify:
     name: Verify
     runs-on: ubuntu-latest
@@ -48,10 +48,8 @@ jobs:
         run: |
           echo "Node version:"
           node --version
-
           echo "npm version:"
           npm --version
-
           echo "Node binary:"
           which node
 
@@ -65,7 +63,6 @@ jobs:
   # ==========================================
   # JOB 2: PACKAGE
   # ==========================================
-
   package:
     name: Package
     needs: verify
@@ -146,18 +143,18 @@ jobs:
   # ==========================================
   # JOB 3: ANNOUNCE
   # ==========================================
-
   announce:
-  name: Announce
-  needs: package
-  if: ${{ needs.package.result == 'success' }}
-  runs-on: ubuntu-latest
-  steps:
-    - name: Check out repository
-      uses: actions/checkout@v4
+    name: Announce
+    needs: package
+    if: ${{ needs.package.result == 'success' }}
+    runs-on: ubuntu-latest
 
-    - name: Announce release
-      run: |
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Announce release
+        run: |
           SHORT_SHA="${GITHUB_SHA:0:7}"
           RELEASE_REFERENCE="${SERVICE_NAME}-${GITHUB_RUN_NUMBER}-${SHORT_SHA}"
 
@@ -167,8 +164,10 @@ jobs:
 
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             echo "Release candidate announced."
+
           elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref }}" = "refs/heads/main" ]; then
             echo "Release announced."
           fi
 
           echo "Release train complete"
+```
