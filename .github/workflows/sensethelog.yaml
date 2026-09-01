@@ -1,0 +1,33 @@
+name: CI Pipeline
+
+on: [push, pull_request]
+
+# Declaring permissions replaces ALL defaults — unlisted scopes become "none"
+permissions:
+  actions: read        # SenseTheLog: fetch workflow run logs to analyze
+  contents: read        # checkout: clone the repo | SenseTheLog: read code diff for context
+  pull-requests: write  # SenseTheLog: post the analysis as a PR comment
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: react-app
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24.x'
+      - run: npm install
+      - run: npm test
+
+  analyze:
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: failure()   # only runs when build fails
+    steps:
+      - name: Analyze with SenseTheLog
+        uses: sensethelog/action@v1
+        with:
+          sensethelog-api-key: ${{ secrets.SENSETHELOG_API_KEY }}   # auth to SenseTheLog's API, separate from GITHUB_TOKEN permissions above
