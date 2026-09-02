@@ -8,13 +8,13 @@ run-name: >-
   ${{ github.event_name == 'workflow_dispatch' && inputs.deep_scan && 'SCAN' || '' }}
 
 on:
-  push:
-    branches:
-      - main
+  # push:
+  #   branches:
+  #     - main
 
-  pull_request:
-    branches:
-      - main
+  # pull_request:
+  #   branches:
+  #     - main
 
   workflow_dispatch:
     inputs:

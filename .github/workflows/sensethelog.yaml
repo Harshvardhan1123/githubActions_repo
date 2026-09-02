@@ -8,6 +8,7 @@ permissions:
   contents: read        # checkout: clone the repo | SenseTheLog: read code diff for context
   pull-requests: write  # SenseTheLog: post the analysis as a PR comment
 
+
 jobs:
   build:
     runs-on: ubuntu-latest

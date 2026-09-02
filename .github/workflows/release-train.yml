@@ -1,16 +1,16 @@
 name: Release Train
 
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-    branches:
-      - main
+  # pull_request:
+  #   types:
+  #     - opened
+  #     - synchronize
+  #   branches:
+  #     - main
 
-  push:
-    branches:
-      - main
+  # push:
+  #   branches:
+  #     - main
 
   workflow_dispatch:
 
